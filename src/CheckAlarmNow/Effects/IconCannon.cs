@@ -14,12 +14,12 @@ public class IconCannon
     private const int IconSize = 48;
     private const int Margin = 80;
     private const int TaskbarHeight = 60;
-    private const int MaxFlightFrames = 150; // ~2.5초 후 강제 착지
+    private const int FlightDurationFrames = 90; // ~1.5초 비행 시간
 
     private readonly List<IconProjectile> _projectiles = new();
     private readonly DispatcherTimer _animTimer;
     private readonly Random _rand = new();
-    private ImageSource? _cachedIcon;
+    private readonly Dictionary<string, ImageSource?> _iconCache = new();
 
     public bool IsActive => _projectiles.Count > 0;
 
@@ -32,8 +32,13 @@ public class IconCannon
     /// <summary>아이콘 1개를 발사합니다. 반복 호출하면 계속 추가됩니다.</summary>
     public void FireOne(string appName, double petX, double petY, ImageSource? fallback)
     {
-        _cachedIcon ??= GetAppIcon(appName) ?? fallback;
-        if (_cachedIcon == null) return;
+        if (!_iconCache.TryGetValue(appName, out var icon))
+        {
+            icon = GetAppIcon(appName) ?? fallback;
+            _iconCache[appName] = icon;
+        }
+        if (icon == null) return;
+        var _cachedIcon = icon;
 
         var area = SystemParameters.WorkArea;
         var targetX = _rand.Next(Margin, (int)(area.Width - Margin));
@@ -52,7 +57,7 @@ public class IconCannon
         foreach (var p in _projectiles)
             p.Close();
         _projectiles.Clear();
-        _cachedIcon = null;
+        _iconCache.Clear();
     }
 
     private void OnAnimate(object? sender, EventArgs e)
@@ -65,21 +70,15 @@ public class IconCannon
                 continue;
 
             p.FrameCount++;
-            p.Vy += p.Gravity;
-            p.X += p.Vx;
-            p.Y += p.Vy;
 
-            // 착지 조건: 목표 근처 도달 OR 시간 초과 OR 화면 밖
-            var dx = p.X - p.TargetX;
-            var dy = p.Y - p.TargetY;
-            var dist = Math.Sqrt(dx * dx + dy * dy);
+            // 보간 기반: t=0→시작, t=1→목표, 포물선 아치
+            double t = Math.Min(1.0, (double)p.FrameCount / FlightDurationFrames);
+            double eased = t * t * (3 - 2 * t); // smoothstep
+            p.X = p.StartX + (p.TargetX - p.StartX) * eased;
+            p.Y = p.StartY + (p.TargetY - p.StartY) * eased
+                   - p.ArcHeight * Math.Sin(Math.PI * t); // 위로 볼록한 아치
 
-            bool shouldStick = dist < 30
-                || p.FrameCount > MaxFlightFrames
-                || p.Y > area.Height
-                || p.X < -50 || p.X > area.Width + 50;
-
-            if (shouldStick)
+            if (t >= 1.0)
             {
                 p.X = p.TargetX;
                 p.Y = p.TargetY;
@@ -176,11 +175,11 @@ public class IconCannon
 
         public double X { get; set; }
         public double Y { get; set; }
-        public double Vx { get; set; }
-        public double Vy { get; set; }
-        public double Gravity { get; }
+        public double StartX { get; }
+        public double StartY { get; }
         public double TargetX { get; }
         public double TargetY { get; }
+        public double ArcHeight { get; }
         public bool IsStuck { get; set; }
         public int FrameCount { get; set; }
 
@@ -189,17 +188,13 @@ public class IconCannon
         {
             X = startX;
             Y = startY;
+            StartX = startX;
+            StartY = startY;
             TargetX = targetX;
             TargetY = targetY;
-
-            var dx = targetX - startX;
-            var dy = targetY - startY;
-            var dist = Math.Sqrt(dx * dx + dy * dy);
-            if (dist < 1) dist = 1;
-            var speed = 8 + rand.NextDouble() * 6;
-            Vx = dx / dist * speed;
-            Vy = dy / dist * speed - (12 + rand.NextDouble() * 10);
-            Gravity = 0.8 + rand.NextDouble() * 0.6;
+            // 아치 높이: 거리에 비례 (100~250px)
+            var dist = Math.Sqrt((targetX - startX) * (targetX - startX) + (targetY - startY) * (targetY - startY));
+            ArcHeight = Math.Max(100, Math.Min(250, dist * 0.3)) + rand.NextDouble() * 50;
 
             _window = new Window
             {

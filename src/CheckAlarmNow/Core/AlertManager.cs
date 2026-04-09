@@ -19,7 +19,8 @@ public class AlertManager
     private PetState _lastState = PetState.Idle;
     private DateTime? _happyUntil;
     private DateTime _lastCannonFire = DateTime.MinValue;
-    private const double CannonIntervalSeconds = 5.0; // 5초마다 1개씩 추가 발사
+    private int _cannonAppIndex; // 여러 앱 아이콘 라운드로빈
+    private const double CannonIntervalSeconds = 5.0;
 
     public event Action<PetState, double>? StateUpdated;
 
@@ -112,10 +113,20 @@ public class AlertManager
                         _monitor.RemoveFlashNotification(m.AppName);
                     }
 
-                    _happyUntil = DateTime.Now.AddSeconds(2);
+                    // active 재계산: 방금 스누즈한 것 제외
+                    active = active.Where(n => !_snoozedIds.Contains(n.Id)).ToList();
+
+                    if (active.Count == 0)
+                    {
+                        // 모든 앱 확인 완료
+                        _happyUntil = DateTime.Now.AddSeconds(2);
+                        _cannon.Clear();
+                        UpdateState(PetState.Happy, 0);
+                        return;
+                    }
+                    // 아직 안 본 앱 남아있음 → HAPPY 없이 아래 WARN/ALERT로 계속
                     _cannon.Clear();
-                    UpdateState(PetState.Happy, 0);
-                    return;
+                    _lastCannonFire = DateTime.MinValue;
                 }
             }
             catch { }
@@ -131,12 +142,14 @@ public class AlertManager
             var divisor = patienceSeconds > 0 ? patienceSeconds * 2.0 : 60.0;
             var annoyance = Math.Min(1.0, (elapsed.TotalSeconds - patienceSeconds) / divisor);
 
-            // ALERT 유지 중 5초마다 아이콘 1개씩 추가 발사
+            // ALERT 유지 중 5초마다 아이콘 1개씩 추가 발사 (여러 앱이면 돌아가며)
             if ((DateTime.Now - _lastCannonFire).TotalSeconds >= CannonIntervalSeconds)
             {
                 var petX = _petWindow.Left + _petWindow.ActualWidth / 2;
                 var petY = _petWindow.Top + _petWindow.ActualHeight / 2;
-                var appName = active.First().AppName;
+                var distinctApps = active.Select(n => n.AppName).Distinct().ToList();
+                var appName = distinctApps[_cannonAppIndex % distinctApps.Count];
+                _cannonAppIndex++;
                 _cannon.FireOne(appName, petX, petY, _viewModel.PetImageSource);
                 _lastCannonFire = DateTime.Now;
             }
