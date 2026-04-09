@@ -11,14 +11,15 @@ namespace CheckAlarmNow.Effects;
 
 public class IconCannon
 {
-    private const int NumIcons = 12;
     private const int IconSize = 48;
     private const int Margin = 80;
     private const int TaskbarHeight = 60;
+    private const int MaxFlightFrames = 150; // ~2.5초 후 강제 착지
 
     private readonly List<IconProjectile> _projectiles = new();
     private readonly DispatcherTimer _animTimer;
     private readonly Random _rand = new();
+    private ImageSource? _cachedIcon;
 
     public bool IsActive => _projectiles.Count > 0;
 
@@ -28,23 +29,18 @@ public class IconCannon
         _animTimer.Tick += OnAnimate;
     }
 
-    public void Fire(string appName, double petX, double petY, ImageSource? fallback)
+    /// <summary>아이콘 1개를 발사합니다. 반복 호출하면 계속 추가됩니다.</summary>
+    public void FireOne(string appName, double petX, double petY, ImageSource? fallback)
     {
-        if (IsActive) return; // 이미 발사 중이면 무시
-
-        var icon = GetAppIcon(appName) ?? fallback;
-        if (icon == null) return;
+        _cachedIcon ??= GetAppIcon(appName) ?? fallback;
+        if (_cachedIcon == null) return;
 
         var area = SystemParameters.WorkArea;
+        var targetX = _rand.Next(Margin, (int)(area.Width - Margin));
+        var targetY = _rand.Next(Margin, (int)(area.Height - TaskbarHeight - Margin));
 
-        for (int i = 0; i < NumIcons; i++)
-        {
-            var targetX = _rand.Next(Margin, (int)(area.Width - Margin));
-            var targetY = _rand.Next(Margin, (int)(area.Height - TaskbarHeight - Margin));
-
-            var projectile = new IconProjectile(icon, petX, petY, targetX, targetY, _rand);
-            _projectiles.Add(projectile);
-        }
+        var projectile = new IconProjectile(_cachedIcon, petX, petY, targetX, targetY, _rand);
+        _projectiles.Add(projectile);
 
         if (!_animTimer.IsEnabled)
             _animTimer.Start();
@@ -56,22 +52,34 @@ public class IconCannon
         foreach (var p in _projectiles)
             p.Close();
         _projectiles.Clear();
+        _cachedIcon = null;
     }
 
     private void OnAnimate(object? sender, EventArgs e)
     {
+        var area = SystemParameters.WorkArea;
+
         foreach (var p in _projectiles)
         {
             if (p.IsStuck)
                 continue;
 
+            p.FrameCount++;
             p.Vy += p.Gravity;
             p.X += p.Vx;
             p.Y += p.Vy;
 
+            // 착지 조건: 목표 근처 도달 OR 시간 초과 OR 화면 밖
             var dx = p.X - p.TargetX;
             var dy = p.Y - p.TargetY;
-            if (Math.Sqrt(dx * dx + dy * dy) < 10)
+            var dist = Math.Sqrt(dx * dx + dy * dy);
+
+            bool shouldStick = dist < 30
+                || p.FrameCount > MaxFlightFrames
+                || p.Y > area.Height
+                || p.X < -50 || p.X > area.Width + 50;
+
+            if (shouldStick)
             {
                 p.X = p.TargetX;
                 p.Y = p.TargetY;
@@ -89,7 +97,6 @@ public class IconCannon
     {
         try
         {
-            // 프로세스명으로 exe 경로 찾기 (부분 매칭)
             var all = Process.GetProcesses();
             var match = all.FirstOrDefault(p =>
             {
@@ -119,18 +126,12 @@ public class IconCannon
                 return null;
 
             var bmpSrc = Imaging.CreateBitmapSourceFromHIcon(
-                shInfo.hIcon,
-                Int32Rect.Empty,
-                BitmapSizeOptions.FromEmptyOptions());
+                shInfo.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
             bmpSrc.Freeze();
-
             DestroyIcon(shInfo.hIcon);
             return bmpSrc;
         }
-        catch
-        {
-            return null;
-        }
+        catch { return null; }
     }
 
     #region P/Invoke
@@ -181,6 +182,7 @@ public class IconCannon
         public double TargetX { get; }
         public double TargetY { get; }
         public bool IsStuck { get; set; }
+        public int FrameCount { get; set; }
 
         public IconProjectile(ImageSource icon, double startX, double startY,
             double targetX, double targetY, Random rand)
@@ -190,15 +192,14 @@ public class IconCannon
             TargetX = targetX;
             TargetY = targetY;
 
-            // 물리: Python 버전과 동일한 느린 포물선
             var dx = targetX - startX;
             var dy = targetY - startY;
             var dist = Math.Sqrt(dx * dx + dy * dy);
             if (dist < 1) dist = 1;
-            var speed = 8 + rand.NextDouble() * 6; // 8~14
+            var speed = 8 + rand.NextDouble() * 6;
             Vx = dx / dist * speed;
-            Vy = dy / dist * speed - (12 + rand.NextDouble() * 10); // 위로 12~22
-            Gravity = 0.8 + rand.NextDouble() * 0.6; // 0.8~1.4
+            Vy = dy / dist * speed - (12 + rand.NextDouble() * 10);
+            Gravity = 0.8 + rand.NextDouble() * 0.6;
 
             _window = new Window
             {
@@ -234,9 +235,6 @@ public class IconCannon
             _window.Top = Y;
         }
 
-        public void Close()
-        {
-            _window.Close();
-        }
+        public void Close() => _window.Close();
     }
 }

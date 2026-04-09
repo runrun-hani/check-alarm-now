@@ -18,6 +18,8 @@ public class AlertManager
     private readonly IconCannon _cannon;
     private PetState _lastState = PetState.Idle;
     private DateTime? _happyUntil;
+    private DateTime _lastCannonFire = DateTime.MinValue;
+    private const double CannonIntervalSeconds = 5.0; // 5초마다 1개씩 추가 발사
 
     public event Action<PetState, double>? StateUpdated;
 
@@ -129,13 +131,14 @@ public class AlertManager
             var divisor = patienceSeconds > 0 ? patienceSeconds * 2.0 : 60.0;
             var annoyance = Math.Min(1.0, (elapsed.TotalSeconds - patienceSeconds) / divisor);
 
-            // Alert 진입 시 대포 발사 (1회만)
-            if (!_cannon.IsActive)
+            // ALERT 유지 중 5초마다 아이콘 1개씩 추가 발사
+            if ((DateTime.Now - _lastCannonFire).TotalSeconds >= CannonIntervalSeconds)
             {
                 var petX = _petWindow.Left + _petWindow.ActualWidth / 2;
                 var petY = _petWindow.Top + _petWindow.ActualHeight / 2;
                 var appName = active.First().AppName;
-                _cannon.Fire(appName, petX, petY, _viewModel.PetImageSource);
+                _cannon.FireOne(appName, petX, petY, _viewModel.PetImageSource);
+                _lastCannonFire = DateTime.Now;
             }
 
             UpdateState(PetState.Alert, annoyance);
