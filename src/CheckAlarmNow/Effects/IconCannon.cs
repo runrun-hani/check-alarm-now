@@ -5,7 +5,6 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace CheckAlarmNow.Effects;
@@ -200,72 +199,24 @@ public class IconCannon
 
         public void ShowCrack()
         {
-            // 균열 이펙트: 아이콘 앞에 방사형 깨짐 표시
+            // 균열 이펙트: Crack.png 이미지를 아이콘 앞에 표시
             _crackWindow = CreateWindow(CrackSize, CrackSize,
                 X - (CrackSize - IconSize) / 2.0,
                 Y - (CrackSize - IconSize) / 2.0);
 
-            var canvas = new Canvas { Width = CrackSize, Height = CrackSize };
-            var center = CrackSize / 2.0;
-            var rand = new Random();
-
-            // 방사형 균열 선 10~15개 (굵고 잘 보이게)
-            int numCracks = rand.Next(10, 16);
-            for (int i = 0; i < numCracks; i++)
+            var crackImage = new System.Windows.Controls.Image
             {
-                double angle = rand.NextDouble() * Math.PI * 2;
-                double length = 18 + rand.NextDouble() * 22;
+                Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Crack.png")),
+                Width = CrackSize,
+                Height = CrackSize,
+                Stretch = Stretch.Uniform,
+                RenderTransformOrigin = new System.Windows.Point(0.5, 0.5),
+                // 랜덤 회전: 반복이 티 안 나게
+                RenderTransform = new RotateTransform(new Random().NextDouble() * 360),
+            };
 
-                // 검정 테두리 (굵은 선)
-                canvas.Children.Add(new Line
-                {
-                    X1 = center, Y1 = center,
-                    X2 = center + Math.Cos(angle) * length,
-                    Y2 = center + Math.Sin(angle) * length,
-                    Stroke = new SolidColorBrush(Color.FromArgb(220, 20, 20, 20)),
-                    StrokeThickness = 3.0 + rand.NextDouble(),
-                });
-                // 밝은 내부 선 (유리 깨짐 느낌)
-                canvas.Children.Add(new Line
-                {
-                    X1 = center, Y1 = center,
-                    X2 = center + Math.Cos(angle) * length,
-                    Y2 = center + Math.Sin(angle) * length,
-                    Stroke = new SolidColorBrush(Color.FromArgb(200, 200, 200, 220)),
-                    StrokeThickness = 1.5,
-                });
-
-                // 갈래 (70% 확률로 분기)
-                if (rand.NextDouble() > 0.3)
-                {
-                    double branchStart = 0.4 + rand.NextDouble() * 0.3;
-                    double branchAngle = angle + (rand.NextDouble() - 0.5) * 1.2;
-                    double branchLen = length * (0.3 + rand.NextDouble() * 0.4);
-                    double bx = center + Math.Cos(angle) * length * branchStart;
-                    double by = center + Math.Sin(angle) * length * branchStart;
-
-                    canvas.Children.Add(new Line
-                    {
-                        X1 = bx, Y1 = by,
-                        X2 = bx + Math.Cos(branchAngle) * branchLen,
-                        Y2 = by + Math.Sin(branchAngle) * branchLen,
-                        Stroke = new SolidColorBrush(Color.FromArgb(200, 30, 30, 30)),
-                        StrokeThickness = 2.0 + rand.NextDouble() * 0.5,
-                    });
-                    canvas.Children.Add(new Line
-                    {
-                        X1 = bx, Y1 = by,
-                        X2 = bx + Math.Cos(branchAngle) * branchLen,
-                        Y2 = by + Math.Sin(branchAngle) * branchLen,
-                        Stroke = new SolidColorBrush(Color.FromArgb(160, 180, 180, 200)),
-                        StrokeThickness = 1.0,
-                    });
-                }
-            }
-
-            _crackWindow.Content = canvas;
+            _crackWindow.Content = crackImage;
             _crackWindow.Show();
-            // 균열이 아이콘 앞에 오도록 (나중에 Show한 게 위로)
         }
 
         public void UpdatePosition()

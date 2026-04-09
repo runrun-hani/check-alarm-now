@@ -20,6 +20,7 @@
     <Resource Include="Assets\Default.png" />
     <Resource Include="Assets\Sleeping.png" />
     <Resource Include="Assets\WakeUp.png" />
+    <Resource Include="Assets\Crack.png" />
   </ItemGroup>
 
   <ItemGroup>
