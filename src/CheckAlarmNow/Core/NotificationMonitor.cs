@@ -11,6 +11,7 @@ public class NotificationMonitor
 {
     private readonly AppSettings _settings;
     private readonly Dictionary<uint, NotificationInfo> _unread = new();
+    private readonly Dictionary<uint, NotificationInfo> _flashUnread = new();
     private readonly HashSet<string> _allAppNames = new();
     private readonly DispatcherTimer _timer;
     private UserNotificationListener? _listener;
@@ -55,8 +56,52 @@ public class NotificationMonitor
     public List<NotificationInfo> GetUnread()
     {
         lock (_unread)
+        lock (_flashUnread)
         {
-            return _unread.Values.ToList();
+            return _unread.Values.Concat(_flashUnread.Values).ToList();
+        }
+    }
+
+    /// <summary>태스크바 깜빡임으로 감지된 앱을 알림으로 추가.</summary>
+    public void AddFlashNotification(string displayName, string processName)
+    {
+        uint syntheticId = (uint)(processName.GetHashCode() & 0x7FFFFFFF) | 0x80000000;
+
+        // 모니터링 앱 필터링
+        if (_settings.MonitoredApps.Count > 0)
+        {
+            bool isMonitored = _settings.MonitoredApps.Any(app =>
+                displayName.Contains(app, StringComparison.OrdinalIgnoreCase) ||
+                processName.Contains(app, StringComparison.OrdinalIgnoreCase) ||
+                app.Contains(displayName, StringComparison.OrdinalIgnoreCase) ||
+                app.Contains(processName, StringComparison.OrdinalIgnoreCase));
+            if (!isMonitored)
+            {
+                // 목록에는 표시하되 알림은 추가하지 않음
+                lock (_allAppNames) { _allAppNames.Add(displayName); }
+                return;
+            }
+        }
+
+        lock (_flashUnread)
+        {
+            if (!_flashUnread.ContainsKey(syntheticId))
+                _flashUnread[syntheticId] = new NotificationInfo(syntheticId, displayName, DateTime.Now);
+        }
+        lock (_allAppNames) { _allAppNames.Add(displayName); }
+    }
+
+    /// <summary>확인된 flash 알림을 제거.</summary>
+    public void RemoveFlashNotification(string appName)
+    {
+        lock (_flashUnread)
+        {
+            var toRemove = _flashUnread.Where(kv =>
+                kv.Value.AppName.Contains(appName, StringComparison.OrdinalIgnoreCase) ||
+                appName.Contains(kv.Value.AppName, StringComparison.OrdinalIgnoreCase))
+                .Select(kv => kv.Key).ToList();
+            foreach (var k in toRemove)
+                _flashUnread.Remove(k);
         }
     }
 

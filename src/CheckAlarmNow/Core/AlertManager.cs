@@ -105,7 +105,10 @@ public class AlertManager
                 if (matched.Count > 0)
                 {
                     foreach (var m in matched)
+                    {
                         _snoozedIds.Add(m.Id);
+                        _monitor.RemoveFlashNotification(m.AppName);
+                    }
 
                     _happyUntil = DateTime.Now.AddSeconds(2);
                     _cannon.Clear();
