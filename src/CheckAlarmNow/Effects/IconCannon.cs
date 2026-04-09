@@ -12,7 +12,7 @@ namespace CheckAlarmNow.Effects;
 public class IconCannon
 {
     private const int IconSize = 48;
-    private const int CrackSize = 80; // 균열 이펙트 크기
+    private const int CrackSize = 160; // 균열 이펙트 크기
     private const int Margin = 80;
     private const int TaskbarHeight = 60;
     private const double Speed = 45; // px/frame — 매우 빠름
@@ -210,8 +210,8 @@ public class IconCannon
                 Width = CrackSize,
                 Height = CrackSize,
                 Stretch = Stretch.Uniform,
+                Opacity = 0.7, // 반투명 → 배경과 자연스럽게 섞임
                 RenderTransformOrigin = new System.Windows.Point(0.5, 0.5),
-                // 랜덤 회전: 반복이 티 안 나게
                 RenderTransform = new RotateTransform(new Random().NextDouble() * 360),
             };
 

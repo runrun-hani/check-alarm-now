@@ -65,6 +65,13 @@ public class NotificationMonitor
     /// <summary>태스크바 깜빡임으로 감지된 앱을 알림으로 추가.</summary>
     public void AddFlashNotification(string displayName, string processName)
     {
+        // 초기화 전(시작 직후) flash는 기존 깜빡임이므로 무시
+        if (!_initialized)
+        {
+            lock (_allAppNames) { _allAppNames.Add(displayName); }
+            return;
+        }
+
         uint syntheticId = (uint)(processName.GetHashCode() & 0x7FFFFFFF) | 0x80000000;
 
         // 모니터링 앱 필터링
