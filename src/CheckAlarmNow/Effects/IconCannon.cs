@@ -11,6 +11,11 @@ namespace CheckAlarmNow.Effects;
 
 public class IconCannon
 {
+    private const int NumIcons = 12;
+    private const int IconSize = 48;
+    private const int Margin = 80;
+    private const int TaskbarHeight = 60;
+
     private readonly List<IconProjectile> _projectiles = new();
     private readonly DispatcherTimer _animTimer;
     private readonly Random _rand = new();
@@ -25,17 +30,21 @@ public class IconCannon
 
     public void Fire(string appName, double petX, double petY, ImageSource? fallback)
     {
+        if (IsActive) return; // 이미 발사 중이면 무시
+
         var icon = GetAppIcon(appName) ?? fallback;
         if (icon == null) return;
 
         var area = SystemParameters.WorkArea;
 
-        // 랜덤 목표 위치 (화면 내)
-        var targetX = _rand.NextDouble() * (area.Width - 48);
-        var targetY = _rand.NextDouble() * (area.Height - 100);
+        for (int i = 0; i < NumIcons; i++)
+        {
+            var targetX = _rand.Next(Margin, (int)(area.Width - Margin));
+            var targetY = _rand.Next(Margin, (int)(area.Height - TaskbarHeight - Margin));
 
-        var projectile = new IconProjectile(icon, petX, petY, targetX, targetY);
-        _projectiles.Add(projectile);
+            var projectile = new IconProjectile(icon, petX, petY, targetX, targetY, _rand);
+            _projectiles.Add(projectile);
+        }
 
         if (!_animTimer.IsEnabled)
             _animTimer.Start();
@@ -51,21 +60,18 @@ public class IconCannon
 
     private void OnAnimate(object? sender, EventArgs e)
     {
-        var toRemove = new List<IconProjectile>();
-
         foreach (var p in _projectiles)
         {
             if (p.IsStuck)
                 continue;
 
-            p.Vy += 0.3; // gravity
+            p.Vy += p.Gravity;
             p.X += p.Vx;
             p.Y += p.Vy;
 
-            // 목표 근처 도달
             var dx = p.X - p.TargetX;
             var dy = p.Y - p.TargetY;
-            if (Math.Sqrt(dx * dx + dy * dy) < 30 || p.Y > SystemParameters.WorkArea.Height)
+            if (Math.Sqrt(dx * dx + dy * dy) < 10)
             {
                 p.X = p.TargetX;
                 p.Y = p.TargetY;
@@ -83,34 +89,31 @@ public class IconCannon
     {
         try
         {
-            var procs = Process.GetProcessesByName(appName);
-            if (procs.Length == 0)
+            // 프로세스명으로 exe 경로 찾기 (부분 매칭)
+            var all = Process.GetProcesses();
+            var match = all.FirstOrDefault(p =>
             {
-                // 부분 매칭 시도
-                var all = Process.GetProcesses();
-                var match = all.FirstOrDefault(p =>
+                try
                 {
-                    try { return p.ProcessName.Contains(appName, StringComparison.OrdinalIgnoreCase); }
-                    catch { return false; }
-                });
-                if (match != null)
-                {
-                    procs = new[] { match };
+                    var name = p.ProcessName;
+                    return name.Contains(appName, StringComparison.OrdinalIgnoreCase) ||
+                           appName.Contains(name, StringComparison.OrdinalIgnoreCase);
                 }
-                foreach (var p in all.Where(p => p != match)) p.Dispose();
-            }
-
-            if (procs.Length == 0) return null;
+                catch { return false; }
+            });
 
             string? exePath = null;
-            try { exePath = procs[0].MainModule?.FileName; } catch { }
-            foreach (var p in procs) p.Dispose();
+            if (match != null)
+            {
+                try { exePath = match.MainModule?.FileName; } catch { }
+            }
+            foreach (var p in all) p.Dispose();
 
             if (string.IsNullOrEmpty(exePath)) return null;
 
             var shInfo = new SHFILEINFO();
             var result = SHGetFileInfo(exePath, 0, ref shInfo,
-                (uint)Marshal.SizeOf<SHFILEINFO>(), SHGFI_ICON | SHGFI_SMALLICON);
+                (uint)Marshal.SizeOf<SHFILEINFO>(), SHGFI_ICON | SHGFI_LARGEICON);
 
             if (result == IntPtr.Zero || shInfo.hIcon == IntPtr.Zero)
                 return null;
@@ -133,7 +136,7 @@ public class IconCannon
     #region P/Invoke
 
     private const uint SHGFI_ICON = 0x000000100;
-    private const uint SHGFI_SMALLICON = 0x000000001;
+    private const uint SHGFI_LARGEICON = 0x000000000;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct SHFILEINFO
@@ -174,25 +177,28 @@ public class IconCannon
         public double Y { get; set; }
         public double Vx { get; set; }
         public double Vy { get; set; }
+        public double Gravity { get; }
         public double TargetX { get; }
         public double TargetY { get; }
         public bool IsStuck { get; set; }
 
-        public IconProjectile(ImageSource icon, double startX, double startY, double targetX, double targetY)
+        public IconProjectile(ImageSource icon, double startX, double startY,
+            double targetX, double targetY, Random rand)
         {
             X = startX;
             Y = startY;
             TargetX = targetX;
             TargetY = targetY;
 
-            // 초기 속도: 목표 방향으로 포물선
+            // 물리: Python 버전과 동일한 느린 포물선
             var dx = targetX - startX;
             var dy = targetY - startY;
             var dist = Math.Sqrt(dx * dx + dy * dy);
-            var speed = Math.Min(dist * 0.05, 15);
-            var angle = Math.Atan2(dy, dx);
-            Vx = Math.Cos(angle) * speed;
-            Vy = Math.Sin(angle) * speed - 8; // 위로 쏘기
+            if (dist < 1) dist = 1;
+            var speed = 8 + rand.NextDouble() * 6; // 8~14
+            Vx = dx / dist * speed;
+            Vy = dy / dist * speed - (12 + rand.NextDouble() * 10); // 위로 12~22
+            Gravity = 0.8 + rand.NextDouble() * 0.6; // 0.8~1.4
 
             _window = new Window
             {
@@ -201,8 +207,8 @@ public class IconCannon
                 Background = System.Windows.Media.Brushes.Transparent,
                 Topmost = true,
                 ShowInTaskbar = false,
-                Width = 32,
-                Height = 32,
+                Width = IconSize,
+                Height = IconSize,
                 Left = X,
                 Top = Y,
                 Content = new System.Windows.Controls.Image

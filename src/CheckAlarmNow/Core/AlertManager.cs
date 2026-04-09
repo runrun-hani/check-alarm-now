@@ -42,8 +42,13 @@ public class AlertManager
 
     public void Reset()
     {
-        _snoozedIds.Clear();
+        // 현재 알림을 모두 스누즈 + 대포 정리 + HAPPY 상태
+        var unread = _monitor.GetUnread();
+        foreach (var n in unread)
+            _snoozedIds.Add(n.Id);
         _cannon.Clear();
+        _happyUntil = DateTime.Now.AddSeconds(2);
+        UpdateState(PetState.Happy, 0);
     }
 
     private void OnCheck(object? sender, EventArgs e)
@@ -60,6 +65,17 @@ public class AlertManager
         }
 
         var unread = _monitor.GetUnread();
+
+        // 센터에서 사라진 알림의 스누즈 ID 정리
+        if (unread.Count > 0)
+        {
+            var currentIds = new HashSet<uint>(unread.Select(n => n.Id));
+            _snoozedIds.RemoveWhere(id => !currentIds.Contains(id));
+        }
+        else
+        {
+            _snoozedIds.Clear();
+        }
 
         // snoozed 제외 → active
         var active = unread.Where(n => !_snoozedIds.Contains(n.Id)).ToList();
@@ -91,7 +107,7 @@ public class AlertManager
                     foreach (var m in matched)
                         _snoozedIds.Add(m.Id);
 
-                    _happyUntil = DateTime.Now.AddSeconds(3);
+                    _happyUntil = DateTime.Now.AddSeconds(2);
                     _cannon.Clear();
                     UpdateState(PetState.Happy, 0);
                     return;
@@ -105,27 +121,25 @@ public class AlertManager
         var elapsed = DateTime.Now - oldest;
         var patienceSeconds = _settings.PatienceMinutes * 60;
 
-        if (elapsed.TotalSeconds >= patienceSeconds)
+        if (patienceSeconds == 0 || elapsed.TotalSeconds >= patienceSeconds)
         {
             var divisor = patienceSeconds > 0 ? patienceSeconds * 2.0 : 60.0;
             var annoyance = Math.Min(1.0, (elapsed.TotalSeconds - patienceSeconds) / divisor);
 
-            // Alert 진입 시 대포 발사
-            if (_lastState != PetState.Alert && !_cannon.IsActive)
+            // Alert 진입 시 대포 발사 (1회만)
+            if (!_cannon.IsActive)
             {
                 var petX = _petWindow.Left + _petWindow.ActualWidth / 2;
                 var petY = _petWindow.Top + _petWindow.ActualHeight / 2;
-
-                foreach (var notif in active)
-                {
-                    _cannon.Fire(notif.AppName, petX, petY, _viewModel.PetImageSource);
-                }
+                var appName = active.First().AppName;
+                _cannon.Fire(appName, petX, petY, _viewModel.PetImageSource);
             }
 
             UpdateState(PetState.Alert, annoyance);
         }
         else
         {
+            _cannon.Clear();
             UpdateState(PetState.Warn, 0);
         }
     }

@@ -26,6 +26,7 @@ public partial class App : Application
         }
 
         var settings = AppSettings.Load();
+        _settings = settings;
 
         // NotificationMonitor: WinRT 알림 감시
         _notificationMonitor = new NotificationMonitor(settings);
@@ -51,11 +52,14 @@ public partial class App : Application
         petWindow.Show();
     }
 
+    private AppSettings? _settings;
+
     private void OnExit(object sender, ExitEventArgs e)
     {
         _alertManager?.Stop();
         _notificationMonitor?.Stop();
         _trayManager?.Dispose();
+        _settings?.Save();
         _mutex?.ReleaseMutex();
         _mutex?.Dispose();
     }

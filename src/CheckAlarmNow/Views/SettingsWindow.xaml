@@ -64,10 +64,11 @@
         <!-- 펫 크기 -->
         <GroupBox Header="펫 크기" Margin="0,0,0,8" Padding="8">
             <StackPanel Orientation="Horizontal">
-                <Slider x:Name="SizeSlider" Minimum="0.5" Maximum="5.0" Width="200"
-                        TickFrequency="0.1" IsSnapToTickEnabled="True" Value="1.0"/>
-                <TextBlock Text="{Binding Value, ElementName=SizeSlider, StringFormat={}{0:F1}x}"
-                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <Slider x:Name="SizeSlider" Minimum="1" Maximum="5" Width="200"
+                        TickFrequency="1" IsSnapToTickEnabled="True" Value="3"
+                        ValueChanged="OnSizeChanged"/>
+                <TextBlock x:Name="SizeLabelText" Text="보통"
+                           VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="60"/>
             </StackPanel>
         </GroupBox>
 

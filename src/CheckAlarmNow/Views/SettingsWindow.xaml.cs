@@ -21,7 +21,7 @@ public partial class SettingsWindow : Window
         ("낮음 (3분)", 3),
         ("보통 (5분)", 5),
         ("높음 (10분)", 10),
-        ("매우 높음 (15분)", 15),
+        ("매우 높음 (20분)", 20),
         ("사용자 지정", -1)
     };
 
@@ -52,6 +52,7 @@ public partial class SettingsWindow : Window
         CustomMinutesBox.Text = settings.PatienceMinutes.ToString();
 
         SizeSlider.Value = settings.PetSize;
+        UpdateSizeLabel(settings.PetSize);
         SoundCheck.IsChecked = settings.SoundEnabled;
         AutoStartCheck.IsChecked = AutoStartHelper.IsAutoStartEnabled();
 
@@ -170,6 +171,22 @@ public partial class SettingsWindow : Window
             RefreshMonitoredList();
             ManualAppBox.Clear();
         }
+    }
+
+    private static readonly Dictionary<int, string> SizeLabels = new()
+    {
+        { 1, "매우 작게" }, { 2, "작게" }, { 3, "보통" }, { 4, "크게" }, { 5, "매우 크게" }
+    };
+
+    private void OnSizeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        UpdateSizeLabel(e.NewValue);
+    }
+
+    private void UpdateSizeLabel(double value)
+    {
+        if (SizeLabelText != null)
+            SizeLabelText.Text = SizeLabels.GetValueOrDefault((int)Math.Round(value), "보통");
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
