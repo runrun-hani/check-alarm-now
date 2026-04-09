@@ -11,14 +11,16 @@ public class TrayIconManager : IDisposable
 {
     private readonly NotifyIcon _notifyIcon;
     private readonly AlertManager _alertManager;
+    private readonly NotificationMonitor _monitor;
     private readonly PetWindow _petWindow;
     private readonly AppSettings _settings;
     private readonly ContextMenuStrip _contextMenu;
     private Icon? _currentIcon;
 
-    public TrayIconManager(AlertManager alertManager, PetWindow petWindow, AppSettings settings)
+    public TrayIconManager(AlertManager alertManager, NotificationMonitor monitor, PetWindow petWindow, AppSettings settings)
     {
         _alertManager = alertManager;
+        _monitor = monitor;
         _petWindow = petWindow;
         _settings = settings;
         _contextMenu = CreateContextMenu();
@@ -83,9 +85,11 @@ public class TrayIconManager : IDisposable
         menu.Items.Add("설정", null, (_, _) =>
         {
             var sw = new SettingsWindow(_settings) { Owner = _petWindow };
+            sw.RefreshDetectedApps(_monitor.GetAllAppNames());
             if (sw.ShowDialog() == true)
                 _petWindow.ApplySettingsFromTray();
         });
+        menu.Items.Add("알림 리셋", null, (_, _) => _alertManager.Reset());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("종료", null, (_, _) =>
         {

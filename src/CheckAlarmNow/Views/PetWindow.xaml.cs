@@ -10,6 +10,9 @@ public partial class PetWindow : Window
 {
     private readonly AppSettings _settings;
 
+    public AlertManager? AlertManager { get; set; }
+    public NotificationMonitor? Monitor { get; set; }
+
     public PetWindow(PetViewModel viewModel, AppSettings settings)
     {
         _settings = settings;
@@ -67,8 +70,15 @@ public partial class PetWindow : Window
     private void OnSettingsClick(object sender, RoutedEventArgs e)
     {
         var settingsWindow = new SettingsWindow(_settings) { Owner = this };
+        if (Monitor != null)
+            settingsWindow.RefreshDetectedApps(Monitor.GetAllAppNames());
         if (settingsWindow.ShowDialog() == true)
             ApplySettingsFromTray();
+    }
+
+    private void OnResetClick(object sender, RoutedEventArgs e)
+    {
+        AlertManager?.Reset();
     }
 
     private void OnExitClick(object sender, RoutedEventArgs e)

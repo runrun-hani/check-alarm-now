@@ -16,6 +16,7 @@
     <Window.ContextMenu>
         <ContextMenu>
             <MenuItem Header="설정 (_S)" Click="OnSettingsClick"/>
+            <MenuItem Header="알림 리셋 (_R)" Click="OnResetClick"/>
             <Separator/>
             <MenuItem Header="종료 (_X)" Click="OnExitClick"/>
         </ContextMenu>

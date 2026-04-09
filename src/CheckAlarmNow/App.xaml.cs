@@ -41,8 +41,12 @@ public partial class App : Application
         _alertManager = new AlertManager(viewModel, _notificationMonitor, petWindow, settings);
         _alertManager.Start();
 
+        // PetWindow에 참조 주입
+        petWindow.AlertManager = _alertManager;
+        petWindow.Monitor = _notificationMonitor;
+
         // TrayIcon
-        _trayManager = new TrayIconManager(_alertManager, petWindow, settings);
+        _trayManager = new TrayIconManager(_alertManager, _notificationMonitor, petWindow, settings);
 
         petWindow.Show();
     }

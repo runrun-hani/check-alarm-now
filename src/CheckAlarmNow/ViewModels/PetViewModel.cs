@@ -39,6 +39,12 @@ public partial class PetViewModel : ObservableObject
         CurrentState = state;
         AnnoyanceLevel = annoyance;
 
+        // ALERT 진입 시 사운드 재생
+        if (state == PetState.Alert && prevState != PetState.Alert && _settings.SoundEnabled)
+        {
+            System.Media.SystemSounds.Exclamation.Play();
+        }
+
         // 상태 전환 시 이미지 교체
         if (state != prevState)
             PetImageSource = GetImageForState(state);

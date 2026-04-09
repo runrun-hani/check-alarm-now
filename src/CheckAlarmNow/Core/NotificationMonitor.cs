@@ -14,6 +14,7 @@ public class NotificationMonitor
     private readonly HashSet<string> _allAppNames = new();
     private readonly DispatcherTimer _timer;
     private UserNotificationListener? _listener;
+    private bool _accessGranted;
     private bool _initialized;
 
     public NotificationMonitor(AppSettings settings)
@@ -26,15 +27,22 @@ public class NotificationMonitor
         _timer.Tick += OnTick;
     }
 
-    public void Start()
+    public async void Start()
     {
         try
         {
             _listener = UserNotificationListener.Current;
+            var access = await _listener.RequestAccessAsync();
+            if (access != UserNotificationListenerAccessStatus.Allowed)
+            {
+                Debug.WriteLine($"알림 접근 거부: {access}");
+                return;
+            }
+            _accessGranted = true;
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[NotificationMonitor] UserNotificationListener 초기화 실패: {ex.Message}");
+            Debug.WriteLine($"초기화 실패: {ex.Message}");
         }
         _timer.Start();
     }
@@ -70,17 +78,10 @@ public class NotificationMonitor
 
     private async void OnTick(object? sender, EventArgs e)
     {
-        if (_listener == null) return;
+        if (_listener == null || !_accessGranted) return;
 
         try
         {
-            var accessStatus = _listener.GetAccessStatus();
-            if (accessStatus != UserNotificationListenerAccessStatus.Allowed)
-            {
-                Debug.WriteLine($"[NotificationMonitor] 알림 액세스 미허용: {accessStatus}");
-                return;
-            }
-
             var notifications = await _listener.GetNotificationsAsync(
                 Windows.UI.Notifications.NotificationKinds.Toast);
 

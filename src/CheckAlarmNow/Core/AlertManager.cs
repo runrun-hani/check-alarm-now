@@ -107,7 +107,8 @@ public class AlertManager
 
         if (elapsed.TotalSeconds >= patienceSeconds)
         {
-            var annoyance = Math.Min(1.0, (elapsed.TotalSeconds - patienceSeconds) / (patienceSeconds * 2.0));
+            var divisor = patienceSeconds > 0 ? patienceSeconds * 2.0 : 60.0;
+            var annoyance = Math.Min(1.0, (elapsed.TotalSeconds - patienceSeconds) / divisor);
 
             // Alert 진입 시 대포 발사
             if (_lastState != PetState.Alert && !_cannon.IsActive)
