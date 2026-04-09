@@ -210,11 +210,12 @@ public class IconCannon
                 Width = CrackSize,
                 Height = CrackSize,
                 Stretch = Stretch.Uniform,
-                Opacity = 0.7, // 반투명 → 배경과 자연스럽게 섞임
+                Opacity = 0.7,
                 RenderTransformOrigin = new System.Windows.Point(0.5, 0.5),
                 RenderTransform = new RotateTransform(new Random().NextDouble() * 360),
             };
 
+            RenderOptions.SetBitmapScalingMode(crackImage, BitmapScalingMode.NearestNeighbor);
             _crackWindow.Content = crackImage;
             _crackWindow.Show();
         }
