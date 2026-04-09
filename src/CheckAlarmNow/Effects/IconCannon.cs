@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace CheckAlarmNow.Effects;
@@ -12,9 +13,10 @@ namespace CheckAlarmNow.Effects;
 public class IconCannon
 {
     private const int IconSize = 48;
+    private const int CrackSize = 80; // 균열 이펙트 크기
     private const int Margin = 80;
     private const int TaskbarHeight = 60;
-    private const int FlightDurationFrames = 90; // ~1.5초 비행 시간
+    private const double Speed = 45; // px/frame — 매우 빠름
 
     private readonly List<IconProjectile> _projectiles = new();
     private readonly DispatcherTimer _animTimer;
@@ -29,7 +31,6 @@ public class IconCannon
         _animTimer.Tick += OnAnimate;
     }
 
-    /// <summary>아이콘 1개를 발사합니다. 반복 호출하면 계속 추가됩니다.</summary>
     public void FireOne(string appName, double petX, double petY, ImageSource? fallback)
     {
         if (!_iconCache.TryGetValue(appName, out var icon))
@@ -38,13 +39,12 @@ public class IconCannon
             _iconCache[appName] = icon;
         }
         if (icon == null) return;
-        var _cachedIcon = icon;
 
         var area = SystemParameters.WorkArea;
         var targetX = _rand.Next(Margin, (int)(area.Width - Margin));
         var targetY = _rand.Next(Margin, (int)(area.Height - TaskbarHeight - Margin));
 
-        var projectile = new IconProjectile(_cachedIcon, petX, petY, targetX, targetY, _rand);
+        var projectile = new IconProjectile(icon, petX, petY, targetX, targetY);
         _projectiles.Add(projectile);
 
         if (!_animTimer.IsEnabled)
@@ -62,30 +62,31 @@ public class IconCannon
 
     private void OnAnimate(object? sender, EventArgs e)
     {
-        var area = SystemParameters.WorkArea;
-
         foreach (var p in _projectiles)
         {
             if (p.IsStuck)
                 continue;
 
-            p.FrameCount++;
+            // 직선 이동: 목표를 향해 고속으로
+            var dx = p.TargetX - p.X;
+            var dy = p.TargetY - p.Y;
+            var dist = Math.Sqrt(dx * dx + dy * dy);
 
-            // 보간 기반: t=0→시작, t=1→목표, 포물선 아치
-            double t = Math.Min(1.0, (double)p.FrameCount / FlightDurationFrames);
-            double eased = t * t * (3 - 2 * t); // smoothstep
-            p.X = p.StartX + (p.TargetX - p.StartX) * eased;
-            p.Y = p.StartY + (p.TargetY - p.StartY) * eased
-                   - p.ArcHeight * Math.Sin(Math.PI * t); // 위로 볼록한 아치
-
-            if (t >= 1.0)
+            if (dist <= Speed)
             {
+                // 도착 → 우뚝 멈춤 + 균열 이펙트
                 p.X = p.TargetX;
                 p.Y = p.TargetY;
                 p.IsStuck = true;
+                p.UpdatePosition();
+                p.ShowCrack();
             }
-
-            p.UpdatePosition();
+            else
+            {
+                p.X += dx / dist * Speed;
+                p.Y += dy / dist * Speed;
+                p.UpdatePosition();
+            }
         }
 
         if (_projectiles.All(p => p.IsStuck))
@@ -171,65 +172,121 @@ public class IconCannon
 
     private class IconProjectile
     {
-        private readonly Window _window;
+        private readonly Window _iconWindow;
+        private Window? _crackWindow;
 
         public double X { get; set; }
         public double Y { get; set; }
-        public double StartX { get; }
-        public double StartY { get; }
         public double TargetX { get; }
         public double TargetY { get; }
-        public double ArcHeight { get; }
         public bool IsStuck { get; set; }
-        public int FrameCount { get; set; }
 
         public IconProjectile(ImageSource icon, double startX, double startY,
-            double targetX, double targetY, Random rand)
+            double targetX, double targetY)
         {
             X = startX;
             Y = startY;
-            StartX = startX;
-            StartY = startY;
             TargetX = targetX;
             TargetY = targetY;
-            // 아치 높이: 거리에 비례 (100~250px)
-            var dist = Math.Sqrt((targetX - startX) * (targetX - startX) + (targetY - startY) * (targetY - startY));
-            ArcHeight = Math.Max(100, Math.Min(250, dist * 0.3)) + rand.NextDouble() * 50;
 
-            _window = new Window
+            _iconWindow = CreateWindow(IconSize, IconSize, startX, startY);
+            _iconWindow.Content = new System.Windows.Controls.Image
+            {
+                Source = icon,
+                Stretch = Stretch.Uniform
+            };
+            _iconWindow.Show();
+        }
+
+        public void ShowCrack()
+        {
+            // 균열 이펙트: 아이콘 뒤에 방사형 금 표시
+            _crackWindow = CreateWindow(CrackSize, CrackSize,
+                X - (CrackSize - IconSize) / 2.0,
+                Y - (CrackSize - IconSize) / 2.0);
+
+            var canvas = new Canvas { Width = CrackSize, Height = CrackSize };
+            var center = CrackSize / 2.0;
+            var rand = new Random();
+
+            // 방사형 균열 선 8~12개
+            int numCracks = rand.Next(8, 13);
+            for (int i = 0; i < numCracks; i++)
+            {
+                double angle = rand.NextDouble() * Math.PI * 2;
+                double length = 15 + rand.NextDouble() * 25;
+
+                // 주선
+                var line = new Line
+                {
+                    X1 = center, Y1 = center,
+                    X2 = center + Math.Cos(angle) * length,
+                    Y2 = center + Math.Sin(angle) * length,
+                    Stroke = new SolidColorBrush(Color.FromArgb(180, 40, 40, 40)),
+                    StrokeThickness = 1.5 + rand.NextDouble(),
+                };
+                canvas.Children.Add(line);
+
+                // 갈래 (50% 확률로 분기)
+                if (rand.NextDouble() > 0.5)
+                {
+                    double branchStart = 0.4 + rand.NextDouble() * 0.3;
+                    double branchAngle = angle + (rand.NextDouble() - 0.5) * 1.2;
+                    double branchLen = length * (0.3 + rand.NextDouble() * 0.3);
+
+                    var branch = new Line
+                    {
+                        X1 = center + Math.Cos(angle) * length * branchStart,
+                        Y1 = center + Math.Sin(angle) * length * branchStart,
+                        X2 = center + Math.Cos(angle) * length * branchStart + Math.Cos(branchAngle) * branchLen,
+                        Y2 = center + Math.Sin(angle) * length * branchStart + Math.Sin(branchAngle) * branchLen,
+                        Stroke = new SolidColorBrush(Color.FromArgb(140, 60, 60, 60)),
+                        StrokeThickness = 1.0 + rand.NextDouble() * 0.5,
+                    };
+                    canvas.Children.Add(branch);
+                }
+            }
+
+            _crackWindow.Content = canvas;
+            _crackWindow.Show();
+
+            // 균열을 아이콘 뒤로 보내기
+            _iconWindow.Activate();
+        }
+
+        public void UpdatePosition()
+        {
+            _iconWindow.Left = X;
+            _iconWindow.Top = Y;
+        }
+
+        public void Close()
+        {
+            _iconWindow.Close();
+            _crackWindow?.Close();
+        }
+
+        private static Window CreateWindow(int w, int h, double left, double top)
+        {
+            var win = new Window
             {
                 WindowStyle = WindowStyle.None,
                 AllowsTransparency = true,
                 Background = System.Windows.Media.Brushes.Transparent,
                 Topmost = true,
                 ShowInTaskbar = false,
-                Width = IconSize,
-                Height = IconSize,
-                Left = X,
-                Top = Y,
-                Content = new System.Windows.Controls.Image
-                {
-                    Source = icon,
-                    Stretch = Stretch.Uniform
-                }
+                Width = w,
+                Height = h,
+                Left = left,
+                Top = top,
             };
-
-            _window.SourceInitialized += (_, _) =>
+            win.SourceInitialized += (_, _) =>
             {
-                var hwnd = new WindowInteropHelper(_window).Handle;
+                var hwnd = new WindowInteropHelper(win).Handle;
                 var exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
                 SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT);
             };
-
-            _window.Show();
+            return win;
         }
-
-        public void UpdatePosition()
-        {
-            _window.Left = X;
-            _window.Top = Y;
-        }
-
-        public void Close() => _window.Close();
     }
 }
