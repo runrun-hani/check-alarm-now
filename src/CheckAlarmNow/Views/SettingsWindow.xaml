@@ -1,0 +1,132 @@
+<Window x:Class="CheckAlarmNow.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="알리미 설정" Width="500" Height="650"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="16">
+        <CheckBox x:Name="AutoStartCheck" Content="Windows 시작 시 자동 실행" Margin="0,0,0,8"/>
+
+        <!-- 인내심 설정 -->
+        <GroupBox Header="인내심" Margin="0,0,0,8" Padding="8">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <ComboBox x:Name="PatienceCombo" Width="180" SelectionChanged="OnPatienceChanged"/>
+                    <TextBox x:Name="CustomMinutesBox" Width="60" Margin="8,0,0,0"
+                             Visibility="Collapsed" VerticalAlignment="Center"/>
+                    <TextBlock Text="분" VerticalAlignment="Center" Margin="4,0,0,0"
+                               x:Name="MinuteLabel" Visibility="Collapsed"/>
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 모니터링 앱 -->
+        <GroupBox Header="모니터링 앱" Margin="0,0,0,8" Padding="8">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 감지된 앱 -->
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="감지된 앱" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ListBox x:Name="DetectedAppsList" Height="140"
+                                 SelectionMode="Extended"/>
+                    </StackPanel>
+
+                    <!-- 추가/삭제 버튼 -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0">
+                        <Button Content="추가 →" Click="OnAddMonitoredApp" Padding="4,4" Margin="0,0,0,4"/>
+                        <Button Content="← 삭제" Click="OnRemoveMonitoredApp" Padding="4,4"/>
+                    </StackPanel>
+
+                    <!-- 모니터링 중인 앱 -->
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="모니터링 중" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ListBox x:Name="MonitoredAppsList" Height="110"
+                                 SelectionMode="Extended"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <TextBox x:Name="ManualAppBox" Width="100" Margin="0,0,4,0"
+                                     VerticalAlignment="Center"/>
+                            <Button Content="직접 입력" Click="OnAddManualApp" Padding="4,2"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="비어 있으면 모든 앱의 알림을 감시합니다" FontSize="10" Foreground="Gray" Margin="0,4,0,0"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 펫 크기 -->
+        <GroupBox Header="펫 크기" Margin="0,0,0,8" Padding="8">
+            <StackPanel Orientation="Horizontal">
+                <Slider x:Name="SizeSlider" Minimum="0.5" Maximum="5.0" Width="200"
+                        TickFrequency="0.1" IsSnapToTickEnabled="True" Value="1.0"/>
+                <TextBlock Text="{Binding Value, ElementName=SizeSlider, StringFormat={}{0:F1}x}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 펫 이미지 -->
+        <GroupBox Header="펫 이미지" Margin="0,0,0,8" Padding="8">
+            <StackPanel>
+                <!-- Idle 이미지 -->
+                <StackPanel Orientation="Horizontal" Margin="0,2,0,4">
+                    <Border BorderBrush="Gray" BorderThickness="1" Width="48" Height="48" Margin="0,0,8,0">
+                        <Image x:Name="PreviewIdle" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="대기 (Idle)" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="선택" Click="OnSelectIdleImage" Padding="4,1" FontSize="11"/>
+                            <Button Content="초기화" Click="OnResetIdleImage" Padding="4,1" FontSize="11" Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Warn 이미지 -->
+                <StackPanel Orientation="Horizontal" Margin="0,2,0,4">
+                    <Border BorderBrush="Gray" BorderThickness="1" Width="48" Height="48" Margin="0,0,8,0">
+                        <Image x:Name="PreviewWarn" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="경고 (Warn)" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="선택" Click="OnSelectWarnImage" Padding="4,1" FontSize="11"/>
+                            <Button Content="초기화" Click="OnResetWarnImage" Padding="4,1" FontSize="11" Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Alert 이미지 -->
+                <StackPanel Orientation="Horizontal" Margin="0,2,0,4">
+                    <Border BorderBrush="Gray" BorderThickness="1" Width="48" Height="48" Margin="0,0,8,0">
+                        <Image x:Name="PreviewAlert" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="긴급 (Alert)" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="선택" Click="OnSelectAlertImage" Padding="4,1" FontSize="11"/>
+                            <Button Content="초기화" Click="OnResetAlertImage" Padding="4,1" FontSize="11" Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock Text="미설정 시 기본 이미지 사용" FontSize="10" Foreground="Gray" Margin="0,4,0,0"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- 기타 -->
+        <GroupBox Header="기타" Margin="0,0,0,8" Padding="8">
+            <CheckBox x:Name="SoundCheck" Content="사운드 알림"/>
+        </GroupBox>
+
+        <Button Content="저장" Width="80" HorizontalAlignment="Right"
+                Click="OnSaveClick" Padding="8,4" Margin="0,0,0,8"/>
+    </StackPanel>
+    </ScrollViewer>
+</Window>
