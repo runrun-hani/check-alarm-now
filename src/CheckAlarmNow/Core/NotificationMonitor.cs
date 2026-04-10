@@ -186,11 +186,12 @@ public class NotificationMonitor
                 if (!_initialized)
                     continue;
 
-                // 모니터링 앱 필터링
+                // 모니터링 앱 필터링 (양방향 매칭)
                 if (_settings.MonitoredApps.Count > 0)
                 {
-                    bool isMonitored = _settings.MonitoredApps.Any(
-                        app => appName.Contains(app, StringComparison.OrdinalIgnoreCase));
+                    bool isMonitored = _settings.MonitoredApps.Any(app =>
+                        appName.Contains(app, StringComparison.OrdinalIgnoreCase) ||
+                        app.Contains(appName, StringComparison.OrdinalIgnoreCase));
                     if (!isMonitored)
                         continue;
                 }
@@ -205,11 +206,15 @@ public class NotificationMonitor
             }
 
             // 사라진 알림 제거 (사용자가 직접 해제한 경우)
+            // 사라진 알림의 스누즈 ID도 함께 정리하여 재알림 차단 방지
             lock (_unread)
             {
                 var removed = _unread.Keys.Where(k => !currentIds.Contains(k)).ToList();
                 foreach (var k in removed)
+                {
                     _unread.Remove(k);
+                    _snoozedIds.Remove(k);
+                }
             }
 
             // 초기화 딜레이: 2번의 OnTick 후 _initialized 설정

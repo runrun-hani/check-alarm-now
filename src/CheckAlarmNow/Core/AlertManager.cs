@@ -137,7 +137,7 @@ public class AlertManager
                 var distinctApps = active.Select(n => n.AppName).Distinct().ToList();
                 var appName = distinctApps[_cannonAppIndex % distinctApps.Count];
                 _cannonAppIndex++;
-                _cannon.FireOne(appName, petX, petY, _viewModel.PetImageSource);
+                _cannon.FireOne(appName, petX, petY, null); // 아이콘 없으면 발사하지 않음 (펫 자신 이미지 방지)
                 _lastCannonFire = DateTime.Now;
             }
 

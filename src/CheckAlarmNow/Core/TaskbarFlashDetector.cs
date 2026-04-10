@@ -66,6 +66,10 @@ public class TaskbarFlashDetector
             GetWindowThreadProcessId(flashHwnd, out uint pid);
             if (pid == 0) return;
 
+            // 자기 자신(ChyoChyo) 프로세스는 무시
+            var selfPid = (uint)Process.GetCurrentProcess().Id;
+            if (pid == selfPid) return;
+
             var proc = Process.GetProcessById((int)pid);
 
             // 표시 이름: FileDescription (예: "카카오톡") > 윈도우 타이틀 > 프로세스명
