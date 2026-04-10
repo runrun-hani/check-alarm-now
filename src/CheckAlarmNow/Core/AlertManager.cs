@@ -14,7 +14,6 @@ public class AlertManager
     private readonly Window _petWindow;
     private readonly AppSettings _settings;
     private readonly DispatcherTimer _timer;
-    private readonly HashSet<uint> _snoozedIds = new();
     private readonly IconCannon _cannon;
     private PetState _lastState = PetState.Idle;
     private DateTime? _happyUntil;
@@ -45,10 +44,10 @@ public class AlertManager
 
     public void Reset()
     {
-        // 현재 알림을 모두 스누즈 + 대포 정리 + HAPPY 상태
+        // 현재 알림을 모두 읽음 처리 + 대포 정리 + HAPPY 상태
         var unread = _monitor.GetUnread();
         foreach (var n in unread)
-            _snoozedIds.Add(n.Id);
+            _monitor.MarkAsRead(n.Id);
         _cannon.Clear();
         _happyUntil = DateTime.Now.AddSeconds(2);
         UpdateState(PetState.Happy, 0);
@@ -68,20 +67,9 @@ public class AlertManager
         }
 
         var unread = _monitor.GetUnread();
+        // unread는 이미 NotificationMonitor에서 _snoozedIds로 필터링되어 있음
 
-        // 센터에서 사라진 알림의 스누즈 ID 정리
-        if (unread.Count > 0)
-        {
-            var currentIds = new HashSet<uint>(unread.Select(n => n.Id));
-            _snoozedIds.RemoveWhere(id => !currentIds.Contains(id));
-        }
-        else
-        {
-            _snoozedIds.Clear();
-        }
-
-        // snoozed 제외 → active
-        var active = unread.Where(n => !_snoozedIds.Contains(n.Id)).ToList();
+        var active = unread;
 
         if (active.Count == 0)
         {
@@ -109,12 +97,11 @@ public class AlertManager
                 {
                     foreach (var m in matched)
                     {
-                        _snoozedIds.Add(m.Id);
-                        _monitor.RemoveFlashNotification(m.AppName);
+                        _monitor.MarkAsRead(m.Id);
                     }
 
-                    // active 재계산: 방금 스누즈한 것 제외
-                    active = active.Where(n => !_snoozedIds.Contains(n.Id)).ToList();
+                    // active 재계산: 방금 읽음 처리한 것 제외
+                    active = active.Where(n => !matched.Any(m => m.Id == n.Id)).ToList();
 
                     if (active.Count == 0)
                     {

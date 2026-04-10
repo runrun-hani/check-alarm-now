@@ -13,10 +13,12 @@ public class NotificationMonitor
     private readonly Dictionary<uint, NotificationInfo> _unread = new();
     private readonly Dictionary<uint, NotificationInfo> _flashUnread = new();
     private readonly HashSet<string> _allAppNames = new();
+    private readonly HashSet<uint> _snoozedIds = new();  // 읽은 알림을 추적하여 제외
     private readonly DispatcherTimer _timer;
     private UserNotificationListener? _listener;
     private bool _accessGranted;
     private bool _initialized;
+    private int _initTicks;  // 초기화 딜레이를 위한 tick 카운터
 
     public NotificationMonitor(AppSettings settings)
     {
@@ -58,7 +60,10 @@ public class NotificationMonitor
         lock (_unread)
         lock (_flashUnread)
         {
-            return _unread.Values.Concat(_flashUnread.Values).ToList();
+            // _snoozedIds에 있는 알림 제외
+            var unreadNotifs = _unread.Values.Where(n => !_snoozedIds.Contains(n.Id)).ToList();
+            var flashNotifs = _flashUnread.Values.Where(n => !_snoozedIds.Contains(n.Id)).ToList();
+            return unreadNotifs.Concat(flashNotifs).ToList();
         }
     }
 
@@ -96,6 +101,22 @@ public class NotificationMonitor
                 _flashUnread[syntheticId] = new NotificationInfo(syntheticId, displayName, DateTime.Now);
         }
         lock (_allAppNames) { _allAppNames.Add(displayName); }
+    }
+
+    /// <summary>알림을 읽은 상태로 표시 (스누즈).</summary>
+    public void MarkAsRead(uint id)
+    {
+        _snoozedIds.Add(id);
+    }
+
+    /// <summary>Flash 알림을 읽은 상태로 표시 (syntheticId 기반).</summary>
+    public void MarkFlashAsRead(uint syntheticId)
+    {
+        _snoozedIds.Add(syntheticId);
+        lock (_flashUnread)
+        {
+            _flashUnread.Remove(syntheticId);
+        }
     }
 
     /// <summary>확인된 flash 알림을 제거.</summary>
@@ -191,8 +212,14 @@ public class NotificationMonitor
                     _unread.Remove(k);
             }
 
+            // 초기화 딜레이: 2번의 OnTick 후 _initialized 설정
+            // 이를 통해 앱 시작 시 기존 알림을 확실히 무시할 수 있음
             if (!_initialized)
-                _initialized = true;
+            {
+                _initTicks++;
+                if (_initTicks >= 2)
+                    _initialized = true;
+            }
         }
         catch (Exception ex)
         {
